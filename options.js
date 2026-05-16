@@ -8,9 +8,8 @@ const status = document.getElementById('status');
 
 // Default rules (includes "bro")
 const DEFAULT_RULES = [
- { find: '', replace: '', enabled: true },
- { find: 'dude', replace: '', enabled: true },
- { find: 'lol', replace: '', enabled: true }
+ { find: 'bro', replace: '', enabled: true },
+ { find: 'bruh', replace: '', enabled: true },
 ];
 
 // Load filter rules from storage

@@ -31,14 +31,56 @@ function createWordPattern(findWord, isRemoval) {
   return new RegExp('\\b' + escapedWord + '\\b', 'gi');
 }
 
+const SKIP_TAGS = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'CODE', 'PRE', 'TEXTAREA', 'KBD', 'SAMP'];
+
+// Classes commonly used for code containers across sites
+const SKIP_CLASSES = [
+  'blob-code',       // GitHub file viewer
+  'highlight',       // GitHub / generic syntax highlight
+  'CodeMirror',      // CodeMirror editor
+  'ace_editor',      // Ace editor
+  'monaco-editor',   // VS Code / Monaco
+  'hljs',            // Highlight.js
+  'prism',           // Prism.js
+  'roslyn-highlight', // Some .NET sites
+  'code-block',
+  'code-block-wrapper'
+];
+
+// Walk up the DOM to check if an element is inside a code block
+function isInsideCodeBlock(element) {
+  let current = element;
+  while (current && current !== document.body) {
+    if (SKIP_TAGS.includes(current.tagName)) return true;
+    if (current.classList) {
+      for (const cls of SKIP_CLASSES) {
+        if (current.classList.contains(cls)) return true;
+      }
+    }
+    current = current.parentElement;
+  }
+  return false;
+}
+
 function filterContent(element) {
   if (!isEnabled || !element || !element.childNodes) return;
-  
+
+  // Skip this element entirely if it's a code container
+  if (SKIP_TAGS.includes(element.tagName)) return;
+  if (element.classList) {
+    for (const cls of SKIP_CLASSES) {
+      if (element.classList.contains(cls)) return;
+    }
+  }
+
   for (let child of element.childNodes) {
     if (child.nodeType === Node.TEXT_NODE) {
+      // Check ancestry before touching this text node
+      if (isInsideCodeBlock(child.parentElement)) continue;
+
       let originalText = child.textContent;
       let newText = originalText;
-      
+
       for (let rule of filterRules) {
         if (rule.enabled !== false && rule.find && rule.find.trim()) {
           const replacement = rule.replace || '';
@@ -47,17 +89,14 @@ function filterContent(element) {
           newText = newText.replace(pattern, replacement);
         }
       }
-      
+
       newText = newText.replace(/\s{2,}/g, ' ');
-      
+
       if (newText !== originalText) {
         child.textContent = newText;
       }
     } else if (child.nodeType === Node.ELEMENT_NODE) {
-      const skipTags = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'CODE', 'PRE'];
-      if (!skipTags.includes(child.tagName)) {
-        filterContent(child);
-      }
+      filterContent(child);
     }
   }
 }
