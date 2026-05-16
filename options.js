@@ -6,7 +6,6 @@ const saveBtn = document.getElementById('saveBtn');
 const resetBtn = document.getElementById('resetBtn');
 const status = document.getElementById('status');
 
-// Default rules (includes "bro")
 const DEFAULT_RULES = [
  { find: 'bro', replace: '', enabled: true },
  { find: 'bruh', replace: '', enabled: true },
@@ -14,15 +13,27 @@ const DEFAULT_RULES = [
 
 // Load filter rules from storage
 async function loadRules() {
- try {
- const result = await browser.storage.local.get('filterRules');
- const rules = result.filterRules || DEFAULT_RULES;
- renderRules(rules);
- } catch (error) {
- console.error('Error loading rules:', error);
- showStatus('Error loading settings. Using defaults.', 'error');
- renderRules(DEFAULT_RULES);
- }
+  try {
+    const result = await browser.storage.local.get('filterRules');
+    let rules = result.filterRules;
+
+    // If storage is empty, initialize with defaults AND SAVE THEM
+    if (!rules || rules.length === 0) {
+      console.log('No rules found. Initializing defaults.');
+      rules = DEFAULT_RULES;
+      
+      // CRITICAL: Save defaults immediately so content scripts pick them up
+      await browser.storage.local.set({ filterRules: rules });
+    }
+
+    renderRules(rules);
+  } catch (error) {
+    console.error('Error loading rules:', error);
+    showStatus('Error loading settings. Using defaults.', 'error');
+    renderRules(DEFAULT_RULES);
+    // Also save defaults on error to prevent future issues
+    browser.storage.local.set({ filterRules: DEFAULT_RULES }).catch(() => {});
+  }
 }
 
 // Helper to create input safely

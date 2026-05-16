@@ -16,13 +16,24 @@ const DEFAULT_RULES = [
 async function loadRules() {
   try {
     const result = await browser.storage.local.get('filterRules');
-    const rules = result.filterRules || DEFAULT_RULES;
+    let rules = result.filterRules;
+
+    if (!rules || rules.length === 0) {
+      console.log('No rules found in popup. Initializing defaults.');
+      rules = DEFAULT_RULES;
+      
+      // CRITICAL: Save defaults immediately
+      await browser.storage.local.set({ filterRules: rules });
+    }
+
     renderRules(rules);
     updateStatus(rules.length);
   } catch (error) {
     console.error('Error loading rules:', error);
     showStatus('Error loading settings', 'error');
     renderRules(DEFAULT_RULES);
+    updateStatus(DEFAULT_RULES.length);
+    browser.storage.local.set({ filterRules: DEFAULT_RULES }).catch(() => {});
   }
 }
 
