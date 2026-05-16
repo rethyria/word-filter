@@ -9,73 +9,72 @@ const enableToggle = document.getElementById('enableToggle');
 const status = document.getElementById('status');
 
 const DEFAULT_RULES = [
-  { find: 'bro', replace: '', enabled: true },
-  { find: 'dude', replace: '', enabled: true },
-  { find: 'lol', replace: '', enabled: true }
+ { find: 'bro', replace: '', enabled: true },
+ { find: 'bruh', replace: '', enabled: true }
 ];
 
 async function loadRules() {
-  try {
-    const result = await browser.storage.local.get('filterRules');
-    const rules = result.filterRules || DEFAULT_RULES;
-    renderRules(rules);
-    updateStatus(rules.length);
-  } catch (error) {
-    console.error('Error loading rules:', error);
-    showStatus('Error loading settings', 'error');
-    renderRules(DEFAULT_RULES);
-  }
+ try {
+ const result = await browser.storage.local.get('filterRules');
+ const rules = result.filterRules || DEFAULT_RULES;
+ renderRules(rules);
+ updateStatus(rules.length);
+ } catch (error) {
+ console.error('Error loading rules:', error);
+ showStatus('Error loading settings', 'error');
+ renderRules(DEFAULT_RULES);
+ }
 }
 
 async function loadEnabledState() {
-  try {
-    const result = await browser.storage.local.get('isEnabled');
-    enableToggle.checked = result.isEnabled !== false;
-  } catch (error) {
-    enableToggle.checked = true;
-  }
+ try {
+ const result = await browser.storage.local.get('isEnabled');
+ enableToggle.checked = result.isEnabled !== false;
+ } catch (error) {
+ enableToggle.checked = true;
+ }
 }
 
 function renderRules(rules) {
-  rulesBody.innerHTML = '';
-  
-  if (rules.length === 0) {
-    emptyState.style.display = 'block';
-    return;
-  }
-  
-  emptyState.style.display = 'none';
-  
-  rules.forEach((rule, index) => {
-    const row = document.createElement('tr');
-    
-    const tdCheck = document.createElement('td');
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.className = 'enabled';
-    checkbox.checked = rule.enabled !== false;
-    tdCheck.appendChild(checkbox);
-    row.appendChild(tdCheck);
-    
-    const tdFind = document.createElement('td');
-    const inputFind = document.createElement('input');
-    inputFind.type = 'text';
-    inputFind.className = 'find';
-    inputFind.value = rule.find || '';
-    inputFind.placeholder = 'Word';
-    tdFind.appendChild(inputFind);
-    row.appendChild(tdFind);
-    
-    const tdReplace = document.createElement('td');
-    const inputReplace = document.createElement('input');
-    inputReplace.type = 'text';
-    inputReplace.className = 'replace';
-    inputReplace.value = rule.replace || '';
-    inputReplace.placeholder = 'Replace';
-    tdReplace.appendChild(inputReplace);
-    row.appendChild(tdReplace);
-    
-    const tdActions = document.createElement('td');
+ rulesBody.innerHTML = '';
+ 
+ if (rules.length === 0) {
+ emptyState.style.display = 'block';
+ return;
+ }
+ 
+ emptyState.style.display = 'none';
+ 
+ rules.forEach((rule, index) => {
+ const row = document.createElement('tr');
+ 
+ const tdCheck = document.createElement('td');
+ const checkbox = document.createElement('input');
+ checkbox.type = 'checkbox';
+ checkbox.className = 'enabled';
+ checkbox.checked = rule.enabled !== false;
+ tdCheck.appendChild(checkbox);
+ row.appendChild(tdCheck);
+ 
+ const tdFind = document.createElement('td');
+ const inputFind = document.createElement('input');
+ inputFind.type = 'text';
+ inputFind.className = 'find';
+ inputFind.value = rule.find || '';
+ inputFind.placeholder = 'Word';
+ tdFind.appendChild(inputFind);
+ row.appendChild(tdFind);
+ 
+ const tdReplace = document.createElement('td');
+ const inputReplace = document.createElement('input');
+ inputReplace.type = 'text';
+ inputReplace.className = 'replace';
+ inputReplace.value = rule.replace || '';
+ inputReplace.placeholder = 'Replace';
+ tdReplace.appendChild(inputReplace);
+ row.appendChild(tdReplace);
+ 
+ const tdActions = document.createElement('td');
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'btn-danger delete';
     deleteBtn.textContent = '×';
