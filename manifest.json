@@ -1,31 +1,31 @@
 {
-  "manifest_version": 2,
-  "name": "Word Filter",
-  "version": "1.0",
-  "description": "Filter out specific words from webpages",
-  "permissions": [
-    "activeTab",
-    "storage",
-    "<all_urls>"
-  ],
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ],
-  "browser_action": {
-    "default_title": "Word Filter Settings",
-    "default_popup": "popup.html"
-  },
-  "options_page": "options.html",
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "@word-filter",
-      "data_collection_permissions": {
-        "required": ["none"]
-      }
-    }
-  }
+ "manifest_version": 2,
+ "name": "Word Filter",
+ "version": "1.1",
+ "description": "Filter out specific words from webpages",
+ "permissions": [
+ "activeTab",
+ "storage",
+ "<all_urls>"
+ ],
+ "content_scripts": [
+ {
+ "matches": ["<all_urls>"],
+ "js": ["content.js"],
+ "run_at": "document_idle"
+ }
+ ],
+ "browser_action": {
+ "default_title": "Word Filter Settings",
+ "default_popup": "popup.html"
+ },
+ "options_page": "options.html",
+ "browser_specific_settings": {
+ "gecko": {
+ "id": "@word-filter",
+ "data_collection_permissions": {
+ "required": ["none"]
+ }
+ }
+ }
 }
