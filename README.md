@@ -1,2 +1,2 @@
 # word-filter
-Firefox extension that replaces words with other words or no words at all
+Automatically find and replace words on any webpage. Configure custom rules to swap out terms you'd rather not see, or remove them entirely by leaving the replacement field blank.
