@@ -1,14 +1,22 @@
 // Word Filter Content Script
-let filterRules = [];
+let compiledRules = [];
 let isEnabled = true;
+let isFiltering = false;
+
+// --- Rule loading & compilation ---
 
 async function loadFilterRules() {
   try {
     const result = await browser.storage.local.get('filterRules');
-    filterRules = result.filterRules || [];
+    let rules = result.filterRules;
+    if (!rules || rules.length === 0) {
+      rules = DEFAULT_RULES;
+      await browser.storage.local.set({ filterRules: rules });
+    }
+    compiledRules = compileRules(rules);
   } catch (error) {
     console.error('Error loading filter rules:', error);
-    filterRules = [];
+    compiledRules = [];
   }
 }
 
@@ -23,91 +31,105 @@ async function loadEnabledState() {
 
 function createWordPattern(findWord, isRemoval) {
   const escapedWord = findWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
   if (isRemoval) {
     return new RegExp('\\s?\\b' + escapedWord + '\\b', 'gi');
   }
-  
   return new RegExp('\\b' + escapedWord + '\\b', 'gi');
 }
 
+function compileRules(rules) {
+  return rules
+    .filter(rule => rule.enabled !== false && rule.find && rule.find.trim())
+    .map(rule => {
+      const replacement = rule.replace || '';
+      return {
+        pattern: createWordPattern(rule.find, replacement === ''),
+        replacement,
+      };
+    });
+}
+
+// --- DOM traversal ---
+
 const SKIP_TAGS = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'CODE', 'PRE', 'TEXTAREA', 'KBD', 'SAMP'];
 
-// Classes commonly used for code containers across sites
 const SKIP_CLASSES = [
-  'blob-code',       // GitHub file viewer
-  'highlight',       // GitHub / generic syntax highlight
-  'CodeMirror',      // CodeMirror editor
-  'ace_editor',      // Ace editor
-  'monaco-editor',   // VS Code / Monaco
-  'hljs',            // Highlight.js
-  'prism',           // Prism.js
-  'roslyn-highlight', // Some .NET sites
-  'code-block',
-  'code-block-wrapper'
+  'blob-code', 'highlight', 'CodeMirror', 'ace_editor',
+  'monaco-editor', 'hljs', 'prism', 'roslyn-highlight',
+  'code-block', 'code-block-wrapper',
 ];
 
-// Walk up the DOM to check if an element is inside a code block
-function isInsideCodeBlock(element) {
+function shouldSkip(element) {
+  if (SKIP_TAGS.includes(element.tagName)) return true;
+  if (element.classList) {
+    for (const cls of SKIP_CLASSES) {
+      if (element.classList.contains(cls)) return true;
+    }
+  }
+  return false;
+}
+
+function hasSkippedAncestor(element) {
   let current = element;
   while (current && current !== document.body) {
-    if (SKIP_TAGS.includes(current.tagName)) return true;
-    if (current.classList) {
-      for (const cls of SKIP_CLASSES) {
-        if (current.classList.contains(cls)) return true;
-      }
-    }
+    if (shouldSkip(current)) return true;
     current = current.parentElement;
   }
   return false;
 }
 
+function collectTextNodes(root) {
+  const nodes = [];
+  function walk(element) {
+    if (!element || !element.childNodes) return;
+    if (shouldSkip(element)) return;
+    for (const child of element.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        nodes.push(child);
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        walk(child);
+      }
+    }
+  }
+  walk(root);
+  return nodes;
+}
+
+// --- Text replacement ---
+
+function applyRules(textNode, rules) {
+  let text = textNode.textContent;
+  const original = text;
+  for (const { pattern, replacement } of rules) {
+    text = text.replace(pattern, replacement);
+  }
+  if (text !== original) {
+    textNode.textContent = text.replace(/\s{2,}/g, ' ');
+  }
+}
+
+// --- Orchestration ---
+
 function filterContent(element) {
-  if (!isEnabled || !element || !element.childNodes) return;
+  if (!isEnabled || compiledRules.length === 0) return;
+  // Ancestor check handles the MutationObserver case where element
+  // itself may be inside a code block we haven't descended through.
+  if (hasSkippedAncestor(element)) return;
 
-  // Skip this element entirely if it's a code container
-  if (SKIP_TAGS.includes(element.tagName)) return;
-  if (element.classList) {
-    for (const cls of SKIP_CLASSES) {
-      if (element.classList.contains(cls)) return;
-    }
+  isFiltering = true;
+  const textNodes = collectTextNodes(element);
+  for (const node of textNodes) {
+    applyRules(node, compiledRules);
   }
-
-  for (let child of element.childNodes) {
-    if (child.nodeType === Node.TEXT_NODE) {
-      // Check ancestry before touching this text node
-      if (isInsideCodeBlock(child.parentElement)) continue;
-
-      let originalText = child.textContent;
-      let newText = originalText;
-
-      for (let rule of filterRules) {
-        if (rule.enabled !== false && rule.find && rule.find.trim()) {
-          const replacement = rule.replace || '';
-          const isRemoval = replacement === '';
-          const pattern = createWordPattern(rule.find, isRemoval);
-          newText = newText.replace(pattern, replacement);
-        }
-      }
-
-      newText = newText.replace(/\s{2,}/g, ' ');
-
-      if (newText !== originalText) {
-        child.textContent = newText;
-      }
-    } else if (child.nodeType === Node.ELEMENT_NODE) {
-      filterContent(child);
-    }
-  }
+  isFiltering = false;
 }
 
 function setupMutationObserver() {
   const observer = new MutationObserver((mutations) => {
-    if (!isEnabled) return;
-    
-    for (let mutation of mutations) {
+    if (!isEnabled || isFiltering) return;
+    for (const mutation of mutations) {
       if (mutation.type === 'childList') {
-        for (let node of mutation.addedNodes) {
+        for (const node of mutation.addedNodes) {
           if (node.nodeType === Node.ELEMENT_NODE) {
             filterContent(node);
           } else if (node.nodeType === Node.TEXT_NODE) {
@@ -117,17 +139,12 @@ function setupMutationObserver() {
       }
     }
   });
-  
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
 async function init() {
-  await loadFilterRules();
-  await loadEnabledState();
-  
+  await Promise.all([loadFilterRules(), loadEnabledState()]);
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       filterContent(document.body);
@@ -137,20 +154,21 @@ async function init() {
     filterContent(document.body);
     setupMutationObserver();
   }
-  
-  browser.storage.onChanged.addListener((changes, areaName) => {
+
+  browser.storage.onChanged.addListener((changes) => {
+    let needsRefilter = false;
     if (changes.filterRules) {
-      filterRules = changes.filterRules.newValue || [];
-      filterContent(document.body);
+      compiledRules = compileRules(changes.filterRules.newValue || []);
+      needsRefilter = true;
     }
     if (changes.isEnabled) {
       isEnabled = changes.isEnabled.newValue !== false;
-      filterContent(document.body);
+      needsRefilter = true;
     }
+    if (needsRefilter) filterContent(document.body);
   });
 }
 
-// Listen for messages from popup to toggle
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'toggleFilter') {
     isEnabled = message.enabled;
